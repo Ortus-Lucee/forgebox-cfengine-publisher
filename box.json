@@ -1,0 +1,8 @@
+{
+    "dependencies":{
+        "s3sdk":"^4.4.0+101"
+    },
+    "installPaths":{
+        "s3sdk":"modules/s3sdk/"
+    }
+}
