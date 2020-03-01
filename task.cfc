@@ -23,7 +23,8 @@ component {
 		if( isJSON( local.luceeVersions.fileContent ) ) {
 			local.luceeVersions = deserializeJSON( local.luceeVersions.fileContent ).map( (v)=>{
 				return { version:v.version.reReplace( '([0-9]*\.[0-9]*\.[0-9]*)(\.)([0-9]*)(-.*)?', '\1\4+\3' ), luceeVersion:v.version }
-			} )//.filter( (v)=>!v.version.reFindNoCase( '(snapshot|rc|beta|alpha)' ) )
+				// These versions don't have jars, so ignore
+			} ).filter( (v)=>!v.version.reFindNoCase( '(5\.3\.1\+91|5\.3\.3\+67|5\.3\.1\+91|5\.3\.3\+67)' ) ) // snapshot|rc|beta|alpha
 		}			
 	
 		print.line( local.luceeVersions.len() & ' found ( #local.luceeVersions.first().version# - #local.luceeVersions.last().version# )' ).toConsole()
