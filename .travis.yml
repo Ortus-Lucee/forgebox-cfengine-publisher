@@ -17,6 +17,7 @@ before_install:
 install:
   # Install Commandbox
   - sudo apt-get update && sudo apt-get --assume-yes install commandbox
+  - box install
 
 script:
   - box task run
