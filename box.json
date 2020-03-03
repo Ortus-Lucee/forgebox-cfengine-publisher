@@ -1,6 +1,8 @@
 {
     "dependencies":{
-        "s3sdk":"^4.4.0+101",
+        "s3sdk":"^4.4.0+101"
+    },
+    "devDependencies":{
         "commandbox-dotenv":"^1.8.1"
     },
     "installPaths":{
