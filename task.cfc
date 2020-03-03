@@ -65,7 +65,9 @@ component {
 		// -------------------------------------------------------------------------------
 		
 		var CFEngineURL = 'http:/'&'/update.lucee.org/rest/update/provider/forgebox/';
-		directoryDelete( resolvePath( 'download' ), true )
+		if( directoryExists( resolvePath( 'download' ) ) ) {
+			directoryDelete( resolvePath( 'download' ), true )
+		}
 		directoryCreate( resolvePath( 'download' ), true, true );
 		// Process each version
 		missingVersions.each( (v)=>{
