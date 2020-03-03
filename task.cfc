@@ -126,13 +126,17 @@ component {
 				print.line( 'Pubishing to ForgeBox...' ).toConsole()
 				// Run publish in the same directory as our temp box.json		
 				command( 'publish' ).inWorkingDirectory( resolvePath( 'temp' ) ).run();
+
+				http url=getSystemSetting( 'SLACK_WEBHOOK_URL' ) method="post" {
+					cfhttpparam( type="body", value='{"text":"Lucee #(v.light?' Light':'')# #v.version# published to ForgeBox."}');
+				}				
 				
 			}
 			
 			print.line().line().toConsole()	
 						
 		} );
-		
+				
 		// Peanut Butter Jelly Time!
 		print.greenLine( 'Complete!' );
 	}
