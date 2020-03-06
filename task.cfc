@@ -15,7 +15,7 @@ component {
 			defaultBucketName='downloads.ortussolutions.com'
 		} );
 		command( 'config set' ).params( 'endpoints.forgebox.apitoken'=getSystemSetting( 'FORGEBOX_TOKEN' ) ).flags( 'quiet' ).run();
-		
+				
 		// -------------------------------------------------------------------------------
 		
 		print.text( 'Getting Lucee Versions: ' ).toConsole();
@@ -69,76 +69,103 @@ component {
 			directoryDelete( resolvePath( 'download' ), true )
 		}
 		directoryCreate( resolvePath( 'download' ), true, true );
+		var errors = false;
 		// Process each version
-		missingVersions.each( (v)=>{
-			print.Greenline( 'Processing #v.version##(v.light?' Light':'')# ...' ).toConsole()
-			var localPath = resolvePath( 'download/downloaded-#v.version##(v.light?'-light':'')#.zip' )
-			var s3URI='lucee/lucee/#v.luceeVersion#/cf-engine-#v.luceeVersion##(v.light?'-light':'')#.zip'
-			
-			// Download CF Engine from Lucee's update server
-			if( !fileExists( localPath ) ) {
-				var downloadURL = CFEngineURL & v.luceeVersion & (v.light?'?light=true':'');
-				print.line( 'Downloading #downloadURL# ...' ).toConsole()
-				progressableDownloader.download(
-					downloadURL,
-					localPath,
-					( status )=>progressBar.update( argumentCollection = status ),
-					( newURL )=>{}
-				);
-			}
-			
-			var fileSize = getFileInfo( localPath ).size;
-			// Is download larger than 10MB.  Sometimes Lucee will return a "jar not found" JSON response
-			if( fileSize < 10*1000*1000 ) {
-				print.redLine( 'Downloaded file #localPath# too small [#round(fileSize/1000)#K], ignoring.' )
-				fileDelete( localPath )
-			} else {
+		for( var v in missingVersions ) {
+			try {
+				print.Greenline( 'Processing #v.version##(v.light?' Light':'')# ...' ).toConsole()
+				var localPath = resolvePath( 'download/downloaded-#v.version##(v.light?'-light':'')#.zip' )
+				var s3URI='lucee/lucee/#v.luceeVersion#/cf-engine-#v.luceeVersion##(v.light?'-light':'')#.zip'
 				
-				// Push file to Ortus S3 bucket
-				if(!s3.objectExists( uri=s3URI ) ) {
-					print.line( 'Uploading #s3URI# ...' ).toConsole()
-					var s3Tries = 0;
-					try {
-						s3.putObject( uri=s3URI, data=fileReadBinary( localPath ), contentType='application/octet-stream' );
-					// Sometimes S3 will reset the connection, so try a couple times before giving up
-					} catch( any e ){
-						print.line( e.message ).toConsole()
-						s3Tries++
-						if( s3Tries < 3 ) {
-							sleep( 1000 )
-							retry;
-						}
-					}
+				// Download CF Engine from Lucee's update server
+				if( !fileExists( localPath ) ) {
+					var downloadURL = CFEngineURL & v.luceeVersion & (v.light?'?light=true':'');
+					print.line( 'Downloading #downloadURL# ...' ).toConsole()
+					progressableDownloader.download(
+						downloadURL,
+						localPath,
+						( status )=>progressBar.update( argumentCollection = status ),
+						( newURL )=>{}
+					);
 				}
 				
-				// Seed a temporary box.json file so we can publish this version to ForgeBox
-				directoryCreate( resolvePath( 'temp' ), true, true );
-				fileWrite( resolvePath( 'temp/box.json' ), '{
-				    "name":"Lucee#(v.light?' Light':'')# CF Engine",
-				    "version":"#v.version#",
-				    "createPackageDirectory":false,
-				    "location":"https://downloads.ortussolutions.com/lucee/lucee/#v.luceeVersion#/cf-engine-#v.luceeVersion##(v.light?'-light':'')#.zip",
-				    "slug":"lucee#(v.light?'-light':'')#",
-				    "shortDescription":"Lucee#(v.light?' Light':'')# WAR engine for CommandBox servers.",
-				    "type":"cf-engines"
-				}' )
+				var fileSize = getFileInfo( localPath ).size;
+				// Is download larger than 10MB.  Sometimes Lucee will return a "jar not found" JSON response
+				if( fileSize < 10*1000*1000 ) {
+					print.redLine( 'Downloaded file #localPath# too small [#round(fileSize/1000)#K], ignoring.' )
+					fileDelete( localPath )
+				} else {
+					
+					// Push file to Ortus S3 bucket
+					if(!s3.objectExists( uri=s3URI ) ) {
+						print.line( 'Uploading #s3URI# ...' ).toConsole()
+						var s3Tries = 0;
+						try {
+							s3.putObject( uri=s3URI, data=fileReadBinary( localPath ), contentType='application/octet-stream' );
+						// Sometimes S3 will reset the connection, so try a couple times before giving up
+						} catch( any e ){
+							print.line( e.message ).toConsole()
+							s3Tries++
+							if( s3Tries < 3 ) {
+								sleep( 1000 )
+								retry;
+							}
+							rethrow;
+						}
+					}
+					
+					// Seed a temporary box.json file so we can publish this version to ForgeBox
+					directoryCreate( resolvePath( 'temp' ), true, true );
+					fileWrite( resolvePath( 'temp/box.json' ), '{
+					    "name":"Lucee#(v.light?' Light':'')# CF Engine",
+					    "version":"#v.version#",
+					    "createPackageDirectory":false,
+					    "location":"https://downloads.ortussolutions.com/lucee/lucee/#v.luceeVersion#/cf-engine-#v.luceeVersion##(v.light?'-light':'')#.zip",
+					    "slug":"lucee#(v.light?'-light':'')#",
+					    "shortDescription":"Lucee#(v.light?' Light':'')# WAR engine for CommandBox servers.",
+					    "type":"cf-engines"
+					}' )
+					
+					print.line( 'Pubishing to ForgeBox...' ).toConsole()
+					// Run publish in the same directory as our temp box.json		
+					command( 'publish' ).inWorkingDirectory( resolvePath( 'temp' ) ).run();
+	
+					slackMessage( "Lucee #(v.light?' Light':'')# #v.version# published to ForgeBox." );
+					
+				}
+			} catch( any e ) {
+				errors = true;
+				print
+					.redLine( e.message )
+					.redLine( e.detail )
+					.redLine( e.tagContext[ 1 ].template & ':' &  e.tagContext[ 1 ].line )
+					.toConsole();
 				
-				print.line( 'Pubishing to ForgeBox...' ).toConsole()
-				// Run publish in the same directory as our temp box.json		
-				command( 'publish' ).inWorkingDirectory( resolvePath( 'temp' ) ).run();
-
-				http url=getSystemSetting( 'SLACK_WEBHOOK_URL' ) method="post" {
-					cfhttpparam( type="body", value='{"text":"Lucee #(v.light?' Light':'')# #v.version# published to ForgeBox."}');
-				}				
-				
+				slackMessage( "Error pubilshing Lucee #(v.light?' Light':'')# #v.version#. #chr(10)# #e.message# #chr(10)# #e.detail# #chr(10)# #e.tagContext[ 1 ].template & ':' &  e.tagContext[ 1 ].line# " );
 			}
-			
 			print.line().line().toConsole()	
 						
-		} );
+		}
 				
-		// Peanut Butter Jelly Time!
-		print.greenLine( 'Complete!' );
+		if( errors ) {
+			print.redLine( 'Errors encountered on one or more versions' ).toConsole();
+			return 1;
+		} else {
+			// Peanut Butter Jelly Time!
+			print.greenLine( 'Complete!' );
+		}
+	}
+	
+	function slackMessage( required string message ) {
+		var payload = serializeJSON( {"text":message} );
+		http url=getSystemSetting( 'SLACK_WEBHOOK_URL' ) method="post" result='local.cfhttp' {
+			cfhttpparam( type="body", value='#payload#');
+		}
+		if( local.cfhttp.status_code != '200' ) {
+			print.redLine( 'Error Sending Slack message: #local.cfhttp.statuscode# #local.cfhttp.fileContent# ' );
+			print.redLine( payload );
+				
+		}
 	}
 
 }
