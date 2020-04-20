@@ -134,7 +134,14 @@ component {
 					} catch( any e ){
 						// ForgeBox keeps throwing these but we don't know why.  When it does, the package is still published just fine so ingore them
 						if( e.detail contains '408' ) {
+							
+							print
+								.line( e.message )
+								.line( e.detail )
+								.toConsole()
+
 							slackMessage( e.detail );
+
 						} else {
 							rethrow;
 						}
