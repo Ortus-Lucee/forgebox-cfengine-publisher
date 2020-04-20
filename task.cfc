@@ -126,10 +126,20 @@ component {
 					    "type":"cf-engines"
 					}' )
 					
-					print.line( 'Pubishing to ForgeBox...' ).toConsole()
-					// Run publish in the same directory as our temp box.json		
-					command( 'publish' ).inWorkingDirectory( resolvePath( 'temp' ) ).run();
-	
+					try {
+						
+						print.line( 'Pubishing to ForgeBox...' ).toConsole()
+						// Run publish in the same directory as our temp box.json
+						command( 'publish' ).inWorkingDirectory( resolvePath( 'temp' ) ).run();
+					} catch( any e ){
+						// ForgeBox keeps throwing these but we don't know why.  When it does, the package is still published just fine so ingore them
+						if( e.detail contains '408' ) {
+							slackMessage( e.detail );
+						} else {
+							rethrow;
+						}
+					}
+		
 					slackMessage( "Lucee #(v.light?' Light':'')# #v.version# published to ForgeBox." );
 					
 				}
