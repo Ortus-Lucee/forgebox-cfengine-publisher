@@ -16,7 +16,7 @@ before_install:
 
 install:
   # Install Commandbox
-  - sudo apt-get update || exit 0
+  - sudo apt-get update || echo 'oops'
   - sudo apt-get --assume-yes install commandbox
   - box install --production
 
