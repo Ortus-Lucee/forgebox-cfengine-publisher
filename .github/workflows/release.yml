@@ -1,0 +1,25 @@
+name: Build Lucee Release
+
+on:
+  # Enable manual workflow runs
+  workflow_dispatch:
+  # Enable automated workflow runs from another repo or workflow
+  workflow_call:
+
+jobs:
+  docbox:
+    name: Generate API Docs
+    runs-on: ubuntu-latest
+    container: ghcr.io/foundeo/cfml-ci-tools/cfml-ci-tools:1.0.6
+    if: ${{ github.ref }} == 'master'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: box install --production
+
+      - name: Fetch and publish Lucee releases
+        run: box task run
