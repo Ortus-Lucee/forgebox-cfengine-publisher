@@ -3,10 +3,10 @@ name: Build Lucee Release
 on:
   # Enable manual workflow runs
   workflow_dispatch:
+  # Enable triggering a build via the github API
+  # Or trigger a build from another repo via https://github.com/marketplace/actions/repository-dispatch
   repository_dispatch:
     types: [ forgebox_deploy ]
-  # Enable automated workflow runs from another repo or workflow
-  workflow_call:
 
 jobs:
   build:
