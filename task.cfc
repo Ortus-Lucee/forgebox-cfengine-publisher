@@ -26,7 +26,7 @@ component {
 				// Convert 1.2.3.4-foo to 1.2.3-foo+4 (semver)
 				return { version:v.version.reReplace( '([0-9]*\.[0-9]*\.[0-9]*)(\.)([0-9]*)(-.*)?', '\1\4+\3' ), luceeVersion:v.version }
 				// These versions don't have jars, so ignore
-			} ).filter( (v)=>!v.version.reFindNoCase( '(5\.3\.1\+91|5\.3\.3\+67|5\.3\.1\+91|5\.3\.3\+67)' ) ) // snapshot|rc|beta|alpha
+			} ).filter( (v)=>!v.version.reFindNoCase( '(5\.3\.1\+91|5\.3\.3\+67|5\.3\.1\+91|5\.3\.3\+67|5\.3\.8\+84)' ) ) // snapshot|rc|beta|alpha
 		}			
 	
 		print.line( local.luceeVersions.len() & ' found ( #local.luceeVersions.first().version# - #local.luceeVersions.last().version# )' ).toConsole()
