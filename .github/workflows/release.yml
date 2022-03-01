@@ -7,6 +7,10 @@ on:
   # Or trigger a build from another repo via https://github.com/marketplace/actions/repository-dispatch
   repository_dispatch:
     types: [ forgebox_deploy ]
+  schedule:
+    # Run every day at midnight.
+    # @see https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule
+    - cron:  0 0 * * *
 
 jobs:
   build:
