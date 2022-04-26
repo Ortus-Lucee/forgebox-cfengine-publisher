@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.org/Ortus-Solutions/forgebox-cfengine-publisher.svg?branch=master)](https://travis-ci.org/Ortus-Solutions/forgebox-cfengine-publisher)
-
 # ForgeBox CF Engine Publisher
 
 A task runner to automate publishing of new CF Engines to ForgeBox
