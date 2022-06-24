@@ -158,7 +158,7 @@ component {
 					.redLine( e.tagContext[ 1 ].template & ':' &  e.tagContext[ 1 ].line )
 					.toConsole();
 				
-				slackMessage( "Error pubilshing Lucee #(v.light?' Light':'')# #v.version#. #chr(10)# #e.message# #chr(10)# #e.detail# #chr(10)# #e.tagContext[ 1 ].template & ':' &  e.tagContext[ 1 ].line# " );
+				slackMessage( "Error publishing Lucee #(v.light?' Light':'')# #v.version#. #chr(10)# #e.message# #chr(10)# #e.detail# #chr(10)# #e.tagContext[ 1 ].template & ':' &  e.tagContext[ 1 ].line# " );
 			}
 			print.line().line().toConsole()	
 						
