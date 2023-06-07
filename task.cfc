@@ -86,14 +86,25 @@ component {
 
 				// Download CF Engine from Lucee's update server
 				if( !fileExists( localPath ) ) {
-					var downloadURL = CFEngineURL & v.luceeVersion & (v.light?'?light=true':'');
-					print.line( 'Downloading #downloadURL# ...' ).toConsole()
-					progressableDownloader.download(
-						downloadURL,
-						localPath,
-						( status )=>progressBar.update( argumentCollection = status ),
-						( newURL )=>{}
-					);
+					var downloadTries = 0;
+					try {
+						var downloadURL = CFEngineURL & v.luceeVersion & (v.light?'?light=true':'');
+						print.line( 'Downloading #downloadURL# ...' ).toConsole()
+						progressableDownloader.download(
+							downloadURL,
+							localPath,
+							( status )=>progressBar.update( argumentCollection = status ),
+							( newURL )=>{}
+						);
+					} catch( any e ){
+						print.line( e.message ).toConsole()
+						downloadTries++
+						if( downloadTries < 5 ) {
+							sleep( 10000 )
+							retry;
+						}
+						rethrow;
+					}
 				}
 
 				var fileSize = getFileInfo( localPath ).size;
