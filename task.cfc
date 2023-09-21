@@ -22,7 +22,7 @@ component {
 		// This is every version of Lucee ever published since 5.0.0
 		http url="https://release.lucee.org/rest/update/provider/list?extended=true" result="local.luceeVersions";
 		if( isJSON( local.luceeVersions.fileContent ) ) {
-			local.luceeVersions = deserializeJSON( local.luceeVersions.fileContent ).map( (v)=>{
+			local.luceeVersions = deserializeJSON( local.luceeVersions.fileContent ).map( (k,v)=>{
 				// Convert 1.2.3.4-foo to 1.2.3-foo+4 (semver)
 				return {
 					version : v.version.reReplace( '([0-9]*\.[0-9]*\.[0-9]*)(\.)([0-9]*)(-.*)?', '\1\4+\3' ),
@@ -31,7 +31,9 @@ component {
 					fbl : v.fbl ?: ''
 				}
 				// These versions don't have jars, so ignore
-			} ).filter( (v)=>!v.version.reFindNoCase( '(5\.3\.1\+91|5\.3\.3\+67|5\.3\.1\+91|5\.3\.3\+67|5\.3\.8\+84)' ) ) // snapshot|rc|beta|alpha
+			} )
+			.valueArray()
+			.filter( (v)=>!v.version.reFindNoCase( '(5\.3\.1\+91|5\.3\.3\+67|5\.3\.1\+91|5\.3\.3\+67|5\.3\.8\+84)' ) ) // snapshot|rc|beta|alpha
 		} else {
 			print.line( local.luceeVersions );
 			throw( 'Response from Lucee API is not JSON.' );
