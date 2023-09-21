@@ -24,7 +24,12 @@ component {
 		if( isJSON( local.luceeVersions.fileContent ) ) {
 			local.luceeVersions = deserializeJSON( local.luceeVersions.fileContent ).map( (v)=>{
 				// Convert 1.2.3.4-foo to 1.2.3-foo+4 (semver)
-				return { version:v.version.reReplace( '([0-9]*\.[0-9]*\.[0-9]*)(\.)([0-9]*)(-.*)?', '\1\4+\3' ), luceeVersion:v.version }
+				return {
+					version : v.version.reReplace( '([0-9]*\.[0-9]*\.[0-9]*)(\.)([0-9]*)(-.*)?', '\1\4+\3' ),
+					luceeVersion : v.version,
+					fb : v.fb,
+					fbl : v.fbl
+				}
 				// These versions don't have jars, so ignore
 			} ).filter( (v)=>!v.version.reFindNoCase( '(5\.3\.1\+91|5\.3\.3\+67|5\.3\.1\+91|5\.3\.3\+67|5\.3\.8\+84)' ) ) // snapshot|rc|beta|alpha
 		} else {
@@ -71,7 +76,7 @@ component {
 
 		// -------------------------------------------------------------------------------
 
-		var CFEngineURL = 'http:/'&'/update.lucee.org/rest/update/provider/forgebox/';
+		var CFEngineURL = 'https://cdn.lucee.org/';
 		if( directoryExists( resolvePath( 'download' ) ) ) {
 			directoryDelete( resolvePath( 'download' ), true )
 		}
@@ -82,29 +87,18 @@ component {
 			try {
 				print.Greenline( 'Processing #v.version##(v.light?' Light':'')# ...' ).toConsole()
 				var localPath = resolvePath( 'download/downloaded-#v.version##(v.light?'-light':'')#.zip' )
-				var s3URI='lucee/lucee/#v.luceeVersion#/cf-engine-#v.luceeVersion##(v.light?'-light':'')#.zip'
+				var s3URI = v.light ? v.fbl : v.fb;
 
 				// Download CF Engine from Lucee's update server
 				if( !fileExists( localPath ) ) {
-					var downloadTries = 0;
-					try {
-						var downloadURL = CFEngineURL & v.luceeVersion & (v.light?'?light=true':'');
-						print.line( 'Downloading #downloadURL# ...' ).toConsole()
-						progressableDownloader.download(
-							downloadURL,
-							localPath,
-							( status )=>progressBar.update( argumentCollection = status ),
-							( newURL )=>{}
-						);
-					} catch( any e ){
-						print.line( e.message ).toConsole()
-						downloadTries++
-						if( downloadTries < 5 ) {
-							sleep( 10000 )
-							retry;
-						}
-						rethrow;
-					}
+					var downloadURL = CFEngineURL & s3URI;
+					print.line( 'Downloading #downloadURL# ...' ).toConsole()
+					progressableDownloader.download(
+						downloadURL,
+						localPath,
+						( status )=>progressBar.update( argumentCollection = status ),
+						( newURL )=>{}
+					);
 				}
 
 				var fileSize = getFileInfo( localPath ).size;
