@@ -27,8 +27,8 @@ component {
 				return {
 					version : v.version.reReplace( '([0-9]*\.[0-9]*\.[0-9]*)(\.)([0-9]*)(-.*)?', '\1\4+\3' ),
 					luceeVersion : v.version,
-					fb : v.fb,
-					fbl : v.fbl
+					fb : v.fb ?: '',
+					fbl : v.fbl ?: ''
 				}
 				// These versions don't have jars, so ignore
 			} ).filter( (v)=>!v.version.reFindNoCase( '(5\.3\.1\+91|5\.3\.3\+67|5\.3\.1\+91|5\.3\.3\+67|5\.3\.8\+84)' ) ) // snapshot|rc|beta|alpha
@@ -65,9 +65,9 @@ component {
 		print.line( 'looking for missing versions starting at #minVersion#' )
 		var missingVersions = []
 			// Lucee versions later than minVersion and not in ForgeBox
-			.append( luceeVersions.filter( (lv)=>!forgeboxVersions.findNoCase( lv.version ) && semanticVersion.isNew( minVersion, lv.version )  ).map( (v)=>duplicate(v).append({light:false}) ), true )
+			.append( luceeVersions.filter( (lv)=>len( lv.fb) && !forgeboxVersions.findNoCase( lv.version ) && semanticVersion.isNew( minVersion, lv.version )  ).map( (v)=>duplicate(v).append({light:false}) ), true )
 			// Add in Lucee Light versions later than minVersion and not in ForgeBox
-			.append( luceeVersions.filter( (lv)=>!forgeboxLightVersions.findNoCase( lv.version ) && semanticVersion.isNew( minVersion, lv.version )  ).map( (v)=>duplicate(v).append({light:true}) ), true );
+			.append( luceeVersions.filter( (lv)=>len( lv.fbl) && !forgeboxLightVersions.findNoCase( lv.version ) && semanticVersion.isNew( minVersion, lv.version )  ).map( (v)=>duplicate(v).append({light:true}) ), true );
 
 
 		print.line( missingVersions.len() & ' missing versions found' ).line().line().toConsole()
