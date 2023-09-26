@@ -89,7 +89,8 @@ component {
 			try {
 				print.Greenline( 'Processing #v.version##(v.light?' Light':'')# ...' ).toConsole()
 				var localPath = resolvePath( 'download/downloaded-#v.version##(v.light?'-light':'')#.zip' )
-				var s3URI='lucee/lucee/#v.luceeVersion#/cf-engine-#v.luceeVersion##(v.light?'-light':'')#.zip'
+				var s3URI = v.light ? v.fbl : v.fb;
+				var Ortuss3URI='lucee/lucee/#v.luceeVersion#/cf-engine-#v.luceeVersion##(v.light?'-light':'')#.zip'
 
 				// Download CF Engine from Lucee's update server
 				if( !fileExists( localPath ) ) {
@@ -111,11 +112,11 @@ component {
 				} else {
 
 					// Push file to Ortus S3 bucket
-					if(!s3.objectExists( uri=s3URI ) ) {
-						print.line( 'Uploading #s3URI# ...' ).toConsole()
+					if(!s3.objectExists( uri=Ortuss3URI ) ) {
+						print.line( 'Uploading #Ortuss3URI# ...' ).toConsole()
 						var s3Tries = 0;
 						try {
-							s3.putObject( uri=s3URI, data=fileReadBinary( localPath ), contentType='application/octet-stream' );
+							s3.putObject( uri=Ortuss3URI, data=fileReadBinary( localPath ), contentType='application/octet-stream' );
 						// Sometimes S3 will reset the connection, so try a couple times before giving up
 						} catch( any e ){
 							print.line( e.message ).toConsole()
