@@ -89,7 +89,7 @@ component {
 			try {
 				print.Greenline( 'Processing #v.version##(v.light?' Light':'')# ...' ).toConsole()
 				var localPath = resolvePath( 'download/downloaded-#v.version##(v.light?'-light':'')#.zip' )
-				var s3URI = v.light ? v.fbl : v.fb;
+				var s3URI='lucee/lucee/#v.luceeVersion#/cf-engine-#v.luceeVersion##(v.light?'-light':'')#.zip'
 
 				// Download CF Engine from Lucee's update server
 				if( !fileExists( localPath ) ) {
