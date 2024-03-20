@@ -110,7 +110,8 @@ component {
 					print.redLine( 'Downloaded file #localPath# too small [#round(fileSize/1000)#K], ignoring.' )
 					fileDelete( localPath )
 				} else {
-
+					print.redLine( 'Downloaded file #localPath# is [#numberFormat(round(fileSize/1000))#K].' )
+					
 					// Push file to Ortus S3 bucket
 					if(!s3.objectExists( uri=Ortuss3URI ) ) {
 						print.line( 'Uploading #Ortuss3URI# ...' ).toConsole()
@@ -168,7 +169,7 @@ component {
 			} catch( any e ) {
 				errors = true;
 				var stackContext = "missing stack";
-				if ( ArrayLen(e.tagContext gt 0 ) ){
+				if ( ArrayLen(e.tagContext) gt 0 ) {
 					stackContext = e.tagContext[ 1 ].template & ':' &  e.tagContext[ 1 ].line;
 				}
 				print
