@@ -109,6 +109,10 @@ component {
 				if( fileSize < 10*1000*1000 ) {
 					print.redLine( 'Downloaded file #localPath# too small [#round(fileSize/1000)#K], ignoring.' )
 					fileDelete( localPath )
+				} else if ( fileSize > 250*1000*1000 ) {
+					// also ignore files larger than 250mb
+					print.redLine( 'Downloaded file #localPath# was too large [#numberFormat(round(fileSize/1000))#K].' )
+					fileDelete( localPath )
 				} else {
 					print.redLine( 'Downloaded file #localPath# is [#numberFormat(round(fileSize/1000))#K].' )
 					
