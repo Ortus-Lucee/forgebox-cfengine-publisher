@@ -167,13 +167,17 @@ component {
 				}
 			} catch( any e ) {
 				errors = true;
+				var stackContext = "missing stack";
+				if ( ArrayLen(e.tagContext gt 0 ) ){
+					stackContext = e.tagContext[ 1 ].template & ':' &  e.tagContext[ 1 ].line;
+				}
 				print
 					.redLine( e.message )
 					.redLine( e.detail )
-					.redLine( e.tagContext[ 1 ].template & ':' &  e.tagContext[ 1 ].line )
+					.redLine( stackContext )
 					.toConsole();
 
-				slackMessage( "Error publishing Lucee #(v.light?' Light':'')# #v.version#. #chr(10)# #e.message# #chr(10)# #e.detail# #chr(10)# #e.tagContext[ 1 ].template & ':' &  e.tagContext[ 1 ].line# " );
+				slackMessage( "Error publishing Lucee #(v.light?' Light':'')# #v.version#. #chr(10)# #e.message# #chr(10)# #e.detail# #chr(10)# #stackContext# " );
 			}
 			print.line().line().toConsole()
 
