@@ -240,6 +240,8 @@ component {
 			httpparam type="header" name="Accept" value="application/vnd.github+json";
 			httpparam type="body" value="#serializeJSON(payload)#";
 		}
+		
+		print.line( result ).toConsole();
 	}
 
 }
