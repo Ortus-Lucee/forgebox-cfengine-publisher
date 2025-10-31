@@ -225,7 +225,7 @@ component {
 		var payload = {
 			"message": "Update last run",
 			"content": toBase64(now().toString()),
-			"branch": "development"
+			"branch": "master"
 		};
 		
 		// Add SHA if file exists
