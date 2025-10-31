@@ -241,7 +241,6 @@ component {
 			httpparam type="body" value="#serializeJSON(payload)#";
 		}
 		
-		print.line( result ).toConsole();
 	}
 
 }
