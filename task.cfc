@@ -196,6 +196,8 @@ component {
 			// Peanut Butter Jelly Time!
 			print.greenLine( 'Complete!' );
 		}
+		print.line().line( "Updating last run in repo" ).toConsole();
+		updateLastRun();
 	}
 
 	function slackMessage( required string message ) {
