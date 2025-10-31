@@ -7,6 +7,7 @@ component {
 	property name="progressBar" 			inject="ProgressBar";
 
 	function run() {
+		variables.ortus_lucee_token=getSystemSetting( 'ORTUS_LUCEE_TOKEN' );
 
 		loadModule( 'modules/s3sdk' )
 		var s3 = getInstance( name='AmazonS3@S3SDK', initArguments={
@@ -206,6 +207,36 @@ component {
 			print.redLine( 'Error Sending Slack message: #local.cfhttp.statuscode# #local.cfhttp.fileContent# ' );
 			print.redLine( payload );
 
+		}
+	}
+
+	function updateLastRun() {
+		
+		var theURL = 'https://api.github.com/repos/Ortus-Lucee/forgebox-cfengine-publisher/contents/lastRun.txt';
+		
+		// Get existing file SHA
+		http url=theURL method="GET" result="local.getResult" throwOnError="false" {
+			httpparam type="header" name="Authorization" value="Bearer #ortus_lucee_token#";
+			httpparam type="header" name="Accept" value="application/vnd.github+json";
+		}
+		
+		var payload = {
+			"message": "Update last run",
+			"content": toBase64(now().toString()),
+			"branch": "development"
+		};
+		
+		// Add SHA if file exists
+		if (local.getResult.status_Code == "200") {
+			payload['sha'] = deserializeJSON(local.getResult.fileContent).sha;
+		} else {
+			print.line( getResult ).toConsole();
+		}
+		
+		http url=theURL method="PUT" result="local.result" {
+			httpparam type="header" name="Authorization" value="Bearer #ortus_lucee_token#";
+			httpparam type="header" name="Accept" value="application/vnd.github+json";
+			httpparam type="body" value="#serializeJSON(payload)#";
 		}
 	}
 
