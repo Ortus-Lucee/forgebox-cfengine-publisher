@@ -29,6 +29,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+        env:
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
 
       - name: Install dependencies
         run: box install --production
