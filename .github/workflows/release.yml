@@ -16,7 +16,7 @@ jobs:
   build:
     name: Build Release
     runs-on: ubuntu-latest
-    container: ghcr.io/foundeo/cfml-ci-tools/cfml-ci-tools:1.0.6
+    container: ghcr.io/foundeo/cfml-ci-tools/cfml-ci-tools:1.1.1
     if: github.ref_name == 'master'
     env:
       FORGEBOX_TOKEN: ${{ secrets.FORGEBOX_API_TOKEN }}
@@ -27,8 +27,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
         env:
           ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
 
