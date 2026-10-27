@@ -1,0 +1,29 @@
+name: Publish Adobe CF Engines
+
+on:
+  schedule:
+    # Run every 2 hours.
+    # @see https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule
+    - cron: 0 */2 * * *
+
+jobs:
+  build:
+    name: Run Adobe Task
+    runs-on: ubuntu-latest
+    container: ghcr.io/foundeo/cfml-ci-tools/cfml-ci-tools:1.1.1
+    env:
+      FORGEBOX_TOKEN: ${{ secrets.FORGEBOX_API_TOKEN }}
+      S3_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+      S3_SECRET: ${{ secrets.AWS_ACCESS_SECRET }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        env:
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+
+      - name: Install dependencies
+        run: box install --production
+
+      - name: Run Adobe task
+        run: box task run task-adobe

@@ -22,3 +22,10 @@ All new Lucee releases that are not published on ForgeBox will be
 * Published to ForgeBox
 
 This is done for Lucee and Lucee Light editions.
+
+## Scheduled Workflows
+
+Each scheduled workflow runs one task CFC:
+
+* [release.yml](.github/workflows/release.yml) - daily at midnight UTC, runs `box task run` (`task.cfc`). Downloads new Lucee releases, uploads them to S3 and publishes them to ForgeBox.
+* [adobe.yml](.github/workflows/adobe.yml) - every 2 hours, runs `box task run task-adobe`. Finds Adobe ColdFusion 2023 and 2025 updates that are not on ForgeBox yet and posts a Slack notice for each one.
