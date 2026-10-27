@@ -88,7 +88,7 @@ component {
 		var itemNodes = xmlSearch( updates, '//item' );
 		// Adobe lists the newest updates first
 		for( var item in itemNodes ) {
-			// <cfhf_id>hf-2025-00014-332029</cfhf_id>
+			
 			var idParts = xmlValue( xmlSearch( item, './cfhf_id' ) ).listToArray( '-' );
 			// Adobe has 2016, 2018 and 2021 updates in here too, we only publish 2023 and 2025
 			if( idParts.len() != 4 || idParts[ 1 ] != 'hf' || !listFind( '2023,2025', idParts[ 2 ] ) ) {
