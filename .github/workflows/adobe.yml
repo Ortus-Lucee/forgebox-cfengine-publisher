@@ -1,4 +1,4 @@
-name: Publish Adobe CF Engines
+name: Monitor Adobe CF Releases
 
 on:
   # Enable manual workflow runs
