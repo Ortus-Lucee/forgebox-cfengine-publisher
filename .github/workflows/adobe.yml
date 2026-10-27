@@ -1,6 +1,8 @@
 name: Publish Adobe CF Engines
 
 on:
+  # Enable manual workflow runs
+  workflow_dispatch:
   schedule:
     # Run every 2 hours.
     # @see https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule
@@ -21,9 +23,6 @@ jobs:
         uses: actions/checkout@v4
         env:
           ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
-
-      - name: Install dependencies
-        run: box install --production
-
+          
       - name: Run Adobe task
         run: box task run task-adobe
