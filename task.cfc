@@ -3,8 +3,15 @@
 */
 component {
 	property name='semanticVersion' inject='semanticVersion@semver';
-	property name="progressableDownloader" 	inject="ProgressableDownloader";
-	property name="progressBar" 			inject="ProgressBar";
+	property name="progressableDownloader" inject="ProgressableDownloader";
+	property name="progressBar" inject="ProgressBar";
+
+	variables.mavenRepoUrl = 'https://maven.lucee-services.com';
+	variables.gitHubReleaseUrl = 'https://github.com/lucee/Lucee/releases/download';
+	// Jars and the packages built from them should be at least 1MB (enough to reject an error page)
+	// and no larger than 250MB.
+	variables.minArtifactBytes = 1000 * 1000;
+	variables.maxArtifactBytes = 250 * 1000 * 1000;
 
 	function run() {
 		variables.ortus_lucee_token=getSystemSetting( 'ORTUS_LUCEE_TOKEN' );
@@ -28,8 +35,8 @@ component {
 				return {
 					version : v.version.reReplace( '([0-9]*\.[0-9]*\.[0-9]*)(\.)([0-9]*)(-.*)?', '\1\4+\3' ),
 					luceeVersion : v.version,
-					fb : v.fb ?: '',
-					fbl : v.fbl ?: ''
+					jar : v.jar ?: '',
+					light : v.light ?: ''
 				}
 				// These versions don't have jars, so ignore
 			} )
@@ -68,18 +75,14 @@ component {
 		print.line( 'looking for missing versions starting at #minVersion#' )
 		var missingVersions = []
 			// Lucee versions later than minVersion and not in ForgeBox
-			.append( luceeVersions.filter( (lv)=>len( lv.fb) && !forgeboxVersions.findNoCase( lv.version ) && semanticVersion.isNew( minVersion, lv.version )  ).map( (v)=>duplicate(v).append({light:false}) ), true )
+			.append( luceeVersions.filter( (lv)=>len( lv.jar ) && !forgeboxVersions.findNoCase( lv.version ) && semanticVersion.isNew( minVersion, lv.version ) ).map( (v)=>duplicate(v).append({light:false}) ), true )
 			// Add in Lucee Light versions later than minVersion and not in ForgeBox
-			.append( luceeVersions.filter( (lv)=>len( lv.fbl) && !forgeboxLightVersions.findNoCase( lv.version ) && semanticVersion.isNew( minVersion, lv.version )  ).map( (v)=>duplicate(v).append({light:true}) ), true );
-
+			.append( luceeVersions.filter( (lv)=>len( lv.light ) && !forgeboxLightVersions.findNoCase( lv.version ) && semanticVersion.isNew( minVersion, lv.version ) ).map( (v)=>duplicate(v).append({light:true}) ), true );
 
 		print.line( missingVersions.len() & ' missing versions found' ).line().line().toConsole()
-		//print.line( missingVersions ).toConsole()
-		//return ;
 
 		// -------------------------------------------------------------------------------
 
-		var CFEngineURL = 'https://cdn.lucee.org/';
 		if( directoryExists( resolvePath( 'download' ) ) ) {
 			directoryDelete( resolvePath( 'download' ), true )
 		}
@@ -90,40 +93,35 @@ component {
 			try {
 				print.Greenline( 'Processing #v.version##(v.light?' Light':'')# ...' ).toConsole()
 				var localPath = resolvePath( 'download/downloaded-#v.version##(v.light?'-light':'')#.zip' )
-				var s3URI = v.light ? v.fbl : v.fb;
 				var Ortuss3URI='lucee/lucee/#v.luceeVersion#/cf-engine-#v.luceeVersion##(v.light?'-light':'')#.zip'
 
-				// Download CF Engine from Lucee's update server
 				if( !fileExists( localPath ) ) {
-					var downloadURL = CFEngineURL & s3URI;
-					print.line( 'Downloading #downloadURL# ...' ).toConsole()
-					progressableDownloader.download(
-						downloadURL,
-						localPath,
-						( status )=>progressBar.update( argumentCollection = status ),
-						( newURL )=>{}
+					buildEnginePackage(
+						luceeVersion = v.luceeVersion,
+						semver = v.version,
+						light = v.light,
+						outputPath = localPath
 					);
 				}
 
 				var fileSize = getFileInfo( localPath ).size;
-				// Is download larger than 10MB.  Sometimes Lucee will return a "jar not found" JSON response
-				if( fileSize < 10*1000*1000 ) {
-					print.redLine( 'Downloaded file #localPath# too small [#round(fileSize/1000)#K], ignoring.' )
+				// Ignore tiny files (usually an error page) and unexpectedly huge ones
+				if( fileSize < variables.minArtifactBytes ) {
+					print.redLine( 'Built file #localPath# too small [#round(fileSize/1000)#K], ignoring.' )
 					fileDelete( localPath )
-				} else if ( fileSize > 250*1000*1000 ) {
-					// also ignore files larger than 250mb
-					print.redLine( 'Downloaded file #localPath# was too large [#numberFormat(round(fileSize/1000))#K].' )
+				} else if ( fileSize > variables.maxArtifactBytes ) {
+					print.redLine( 'Built file #localPath# was too large [#numberFormat(round(fileSize/1000))#K].' )
 					fileDelete( localPath )
 				} else {
-					print.redLine( 'Downloaded file #localPath# is [#numberFormat(round(fileSize/1000))#K].' )
-					
+					print.line( 'Built file #localPath# is [#numberFormat(round(fileSize/1000))#K].' )
+
 					// Push file to Ortus S3 bucket
 					if(!s3.objectExists( uri=Ortuss3URI ) ) {
 						print.line( 'Uploading #Ortuss3URI# ...' ).toConsole()
 						var s3Tries = 0;
 						try {
 							s3.putObject( uri=Ortuss3URI, data=fileReadBinary( localPath ), contentType='application/octet-stream' );
-						// Sometimes S3 will reset the connection, so try a couple times before giving up
+							// Sometimes S3 will reset the connection, so try a couple times before giving up
 						} catch( any e ){
 							print.line( e.message ).toConsole()
 							s3Tries++
@@ -138,14 +136,14 @@ component {
 					// Seed a temporary box.json file so we can publish this version to ForgeBox
 					directoryCreate( resolvePath( 'temp' ), true, true );
 					fileWrite( resolvePath( 'temp/box.json' ), '{
-					    "name":"Lucee#(v.light?' Light':'')# CF Engine",
-					    "version":"#v.version#",
-					    "createPackageDirectory":false,
-					    "location":"https://downloads.ortussolutions.com/lucee/lucee/#v.luceeVersion#/cf-engine-#v.luceeVersion##(v.light?'-light':'')#.zip",
-					    "slug":"lucee#(v.light?'-light':'')#",
-					    "shortDescription":"Lucee#(v.light?' Light':'')# WAR engine for CommandBox servers.",
-					    "type":"cf-engines"
-					}' )
+	"name":"Lucee#(v.light?' Light':'')# CF Engine",
+	"version":"#v.version#",
+	"createPackageDirectory":false,
+	"location":"https://downloads.ortussolutions.com/lucee/lucee/#v.luceeVersion#/cf-engine-#v.luceeVersion##(v.light?'-light':'')#.zip",
+	"slug":"lucee#(v.light?'-light':'')#",
+	"shortDescription":"Lucee#(v.light?' Light':'')# WAR engine for CommandBox servers.",
+	"type":"cf-engines"
+}' )
 
 					try {
 
@@ -153,7 +151,7 @@ component {
 						// Run publish in the same directory as our temp box.json
 						command( 'publish' ).inWorkingDirectory( resolvePath( 'temp' ) ).run();
 					} catch( any e ){
-						// ForgeBox keeps throwing these but we don't know why.  When it does, the package is still published just fine so ingore them
+						// ForgeBox keeps throwing these but we don't know why. When it does, the package is still published just fine so ingore them
 						if( e.detail contains '408' ) {
 
 							print
@@ -175,7 +173,7 @@ component {
 				errors = true;
 				var stackContext = "missing stack";
 				if ( ArrayLen(e.tagContext) gt 0 ) {
-					stackContext = e.tagContext[ 1 ].template & ':' &  e.tagContext[ 1 ].line;
+					stackContext = e.tagContext[ 1 ].template & ':' & e.tagContext[ 1 ].line;
 				}
 				print
 					.redLine( e.message )
@@ -200,6 +198,24 @@ component {
 		updateLastRun();
 	}
 
+	/**
+	 * Build a single engine zip (box.json + engine.war) from the official jar / light jar.
+	 * Usage: box task run buildPackage version=8.0.0.310 light=true dest=/tmp/engine.zip
+	 */
+	function buildPackage( required string version, boolean light=false, string dest='' ) {
+		var luceeVersion = arguments.version;
+		var semver = luceeVersion.reReplace( '([0-9]*\.[0-9]*\.[0-9]*)(\.)([0-9]*)(-.*)?', '\1\4+\3' );
+		var outputPath = len( arguments.dest ) ? arguments.dest : resolvePath( 'download/lucee#( arguments.light ? '-light' : '' )#-#luceeVersion#.zip' );
+		directoryCreate( getDirectoryFromPath( outputPath ), true, true );
+		buildEnginePackage(
+			luceeVersion = luceeVersion,
+			semver = semver,
+			light = arguments.light,
+			outputPath = outputPath
+		);
+		print.greenLine( 'Wrote #outputPath# ([#numberFormat( round( getFileInfo( outputPath ).size / 1000 ) )#K]).' ).toConsole();
+	}
+
 	function slackMessage( required string message ) {
 		var payload = serializeJSON( {"text":message} );
 		http url=getSystemSetting( 'SLACK_WEBHOOK_URL' ) method="post" result='local.cfhttp' {
@@ -213,34 +229,244 @@ component {
 	}
 
 	function updateLastRun() {
-		
+
 		var theURL = 'https://api.github.com/repos/Ortus-Lucee/forgebox-cfengine-publisher/contents/lastRun.txt';
-		
+
 		// Get existing file SHA
 		http url=theURL method="GET" result="local.getResult" throwOnError="false" {
 			httpparam type="header" name="Authorization" value="Bearer #ortus_lucee_token#";
 			httpparam type="header" name="Accept" value="application/vnd.github+json";
 		}
-		
+
 		var payload = {
 			"message": "Update last run",
 			"content": toBase64(now().toString()),
 			"branch": "master"
 		};
-		
+
 		// Add SHA if file exists
 		if (local.getResult.status_Code == "200") {
 			payload['sha'] = deserializeJSON(local.getResult.fileContent).sha;
 		} else {
 			print.line( getResult ).toConsole();
 		}
-		
+
 		http url=theURL method="PUT" result="local.result" {
 			httpparam type="header" name="Authorization" value="Bearer #ortus_lucee_token#";
 			httpparam type="header" name="Accept" value="application/vnd.github+json";
 			httpparam type="body" value="#serializeJSON(payload)#";
 		}
-		
+
+	}
+
+	/**
+	 * Download the official jar, wrap it as engine.war, and zip it with box.json.
+	 */
+	function buildEnginePackage(
+		required string luceeVersion,
+		required string semver,
+		required boolean light,
+		required string outputPath
+	) {
+		var workDir = getTempDirectory() & 'fb-engine-#arguments.luceeVersion##( arguments.light ? '-light' : '' )#-#createUniqueId()#/';
+		directoryCreate( workDir, true, true );
+		try {
+			var jarPath = workDir & 'lucee.jar';
+			downloadLuceeJar( arguments.luceeVersion, arguments.light, jarPath );
+
+			var boxJsonPath = workDir & 'box.json';
+			fileWrite( boxJsonPath, engineBoxJson( arguments.luceeVersion, arguments.semver, arguments.light ) );
+
+			var warPath = workDir & 'engine.war';
+			createEngineWar( arguments.luceeVersion, arguments.light, jarPath, warPath );
+
+			if ( fileExists( arguments.outputPath ) ) {
+				fileDelete( arguments.outputPath );
+			}
+			directoryCreate( getDirectoryFromPath( arguments.outputPath ), true, true );
+			zip action="zip" file="#arguments.outputPath#" overwrite=true {
+				zipparam source=boxJsonPath entrypath="box.json";
+				zipparam source=warPath entrypath="engine.war";
+			}
+		} finally {
+			if ( directoryExists( workDir ) ) {
+				directoryDelete( workDir, true );
+			}
+		}
+	}
+
+	private function downloadLuceeJar( required string version, required boolean light, required string destPath ) {
+		var candidates = jarUrlCandidates( arguments.version, arguments.light );
+		var lastError = 'No download URL is configured.';
+		for ( var candidate in candidates ) {
+			try {
+				// Do not pre-follow redirects with cfhttp: GitHub's signed asset URLs can fail if they are replayed.
+				// ProgressableDownloader follows redirects; the callback keeps the download on allowed hosts.
+				assertAllowedDownloadUrl( candidate );
+				print.line( 'Downloading #candidate# ...' ).toConsole();
+				progressableDownloader.download(
+					candidate,
+					arguments.destPath,
+					( status )=>progressBar.update( argumentCollection = status ),
+					( newURL )=>assertAllowedDownloadUrl( newURL )
+				);
+				assertValidArtifact( arguments.destPath, 'jar' );
+				return;
+			} catch ( any e ) {
+				lastError = e.message;
+				print.line( 'Download failed from #candidate#: #e.message#' ).toConsole();
+				if ( fileExists( arguments.destPath ) ) {
+					fileDelete( arguments.destPath );
+				}
+			}
+		}
+		throw( message='Could not download the Lucee#( arguments.light ? ' light' : '' )# jar for #arguments.version#. #lastError#' );
+	}
+
+	private array function jarUrlCandidates( required string version, required boolean light ) {
+		var urls = [];
+		// Releases, RCs and alphas: GitHub Releases first. Snapshots are not published there.
+		if ( !isSnapshot( arguments.version ) ) {
+			arrayAppend( urls, gitHubJarUrl( arguments.version, arguments.light ) );
+		}
+		arrayAppend( urls, mavenJarUrl( arguments.version, arguments.light ) );
+		return urls;
+	}
+
+	private string function gitHubJarUrl( required string version, required boolean light ) {
+		var tag = reReplaceNoCase( arguments.version, '-(SNAPSHOT|RC|BETA|ALPHA)$', '' );
+		var fileName = arguments.light ? 'lucee-light-#arguments.version#.jar' : 'lucee-#arguments.version#.jar';
+		return variables.gitHubReleaseUrl & '/' & tag & '/' & fileName;
+	}
+
+	private string function mavenJarUrl( required string version, required boolean light ) {
+		var fileName = arguments.light ? 'lucee-#arguments.version#-light.jar' : 'lucee-#arguments.version#.jar';
+		return variables.mavenRepoUrl & '/org/lucee/lucee/' & arguments.version & '/' & fileName;
+	}
+
+	private boolean function isSnapshot( required string version ) {
+		return reFindNoCase( '-SNAPSHOT$', arguments.version ) > 0;
+	}
+
+
+	private function assertAllowedDownloadUrl( required string url ) {
+		if ( !isAllowedDownloadHost( arguments.url ) ) {
+			throw( message='Refusing to download from an unexpected host: #getUrlHost( arguments.url )#' );
+		}
+	}
+
+	private boolean function isAllowedDownloadHost( required string url ) {
+		var host = lCase( getUrlHost( arguments.url ) );
+		if ( !len( host ) ) {
+			return false;
+		}
+		if ( host == 'github.com' || host == 'maven.lucee-services.com' || host == 'mvn.lucee-services.com' ) {
+			return true;
+		}
+		// GitHub release assets are served from release-assets.githubusercontent.com and similar hosts
+		return hostEndsWith( host, '.githubusercontent.com' );
+	}
+
+	private boolean function hostEndsWith( required string host, required string suffix ) {
+		return len( arguments.host ) >= len( arguments.suffix ) && right( arguments.host, len( arguments.suffix ) ) == arguments.suffix;
+	}
+
+	private string function getUrlHost( required string url ) {
+		var match = reFindNoCase( '^https?://([^/]+)', arguments.url, 1, true );
+		if ( match.pos[ 1 ] == 0 || arrayLen( match.pos ) < 2 ) {
+			return '';
+		}
+		return mid( arguments.url, match.pos[ 2 ], match.len[ 2 ] );
+	}
+
+
+	private function assertValidArtifact( required string path, required string kind ) {
+		if ( !fileExists( arguments.path ) ) {
+			throw( message='The downloaded #arguments.kind# is missing.' );
+		}
+		var fileSize = getFileInfo( arguments.path ).size;
+		if ( fileSize < variables.minArtifactBytes ) {
+			throw( message='The downloaded #arguments.kind# is too small ([#round(fileSize/1000)#K]).' );
+		}
+		if ( fileSize > variables.maxArtifactBytes ) {
+			throw( message='The downloaded #arguments.kind# is too large ([#numberFormat(round(fileSize/1000))#K]).' );
+		}
+		var inStream = fileOpen( arguments.path, 'readBinary' );
+		try {
+			var bytes = fileRead( inStream, 4 );
+		} finally {
+			fileClose( inStream );
+		}
+		// PK zip/jar signature (0x50 0x4B)
+		if ( !isBinary( bytes ) || len( bytes ) < 2 || bytes[ 1 ] != 80 || bytes[ 2 ] != 75 ) {
+			throw( message='The downloaded #arguments.kind# is not a zip/jar ([#fileSize# bytes]).' );
+		}
+	}
+
+	private string function engineBoxJson( required string luceeVersion, required string semver, required boolean light ) {
+		// Match the historic package box.json, including the double space in the non-light name.
+		var edition = arguments.light ? 'Light ' : ' ';
+		var json = '{'
+			& '"name":"Lucee #edition#CF Engine",'
+			& '"version":"#arguments.semver#",'
+			& '"createPackageDirectory":false,'
+			& '"slug":"lucee#( arguments.light ? '-light' : '' )#",'
+			& '"shortDescription":"Lucee #edition#WAR engine for CommandBox servers.",'
+			& '"type":"cf-engines"';
+		if ( versionGTE( arguments.luceeVersion, 7 ) ) {
+			json &= ',"JakartaEE":true';
+		}
+		json &= '}';
+		return json;
+	}
+
+	private function createEngineWar(
+		required string version,
+		required boolean light,
+		required string jarPath,
+		required string warPath
+	) {
+		var templateRoot = getDirectoryFromPath( getCurrentTemplatePath() ) & 'build/';
+		var webXml = templateRoot & warTemplate( arguments.version ) & '/WEB-INF/web.xml';
+		var license = templateRoot & 'common/License.txt';
+		if ( !fileExists( webXml ) ) {
+			throw( message='Missing WAR template: #webXml#' );
+		}
+		var jarEntry = arguments.light ? 'WEB-INF/lib/lucee-light.jar' : 'WEB-INF/lib/lucee.jar';
+		var deployDir = getTempDirectory() & 'fb-deploy-#createUniqueId()#/';
+		directoryCreate( deployDir, true, true );
+		try {
+			zip action="zip" file="#arguments.warPath#" overwrite=true {
+				zipparam source=webXml entrypath="WEB-INF/web.xml";
+				zipparam source=license entrypath="License.txt";
+				zipparam source=arguments.jarPath entrypath="#jarEntry#";
+				zipparam source=deployDir prefix="WEB-INF/lucee-server/context/deploy";
+			}
+		} finally {
+			if ( directoryExists( deployDir ) ) {
+				directoryDelete( deployDir, true );
+			}
+		}
+	}
+
+	private string function warTemplate( required string version ) {
+		if ( versionGTE( arguments.version, 7 ) ) {
+			return 'war-7.0';
+		}
+		if ( versionGTE( arguments.version, 6, 2 ) ) {
+			return 'war-6.2';
+		}
+		return 'war';
+	}
+
+	private boolean function versionGTE( required string version, required numeric major, numeric minor=0 ) {
+		var parts = listToArray( listFirst( arguments.version, '-' ), '.' );
+		var maj = arrayLen( parts ) >= 1 ? val( parts[ 1 ] ) : 0;
+		var min = arrayLen( parts ) >= 2 ? val( parts[ 2 ] ) : 0;
+		if ( maj > arguments.major ) {
+			return true;
+		}
+		return maj == arguments.major && min >= arguments.minor;
 	}
 
 }
