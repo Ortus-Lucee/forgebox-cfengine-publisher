@@ -6,8 +6,11 @@ component {
 	property name="progressableDownloader" inject="ProgressableDownloader";
 	property name="progressBar" inject="ProgressBar";
 
-	variables.mavenRepoUrl = 'https://maven.lucee-services.com';
 	variables.gitHubReleaseUrl = 'https://github.com/lucee/Lucee/releases/download';
+	variables.sonatypeSnapshotsUrl = 'https://central.sonatype.com/repository/maven-snapshots';
+	variables.mavenCentralUrl = 'https://repo1.maven.org/maven2';
+	// Fallback only. This endpoint will no longer host snapshots in the future, so it must not be the primary source.
+	variables.mavenServicesUrl = 'https://maven.lucee-services.com';
 	// Jars and the packages built from them should be at least 1MB (enough to reject an error page)
 	// and no larger than 250MB.
 	variables.minArtifactBytes = 1000 * 1000;
@@ -325,11 +328,19 @@ component {
 
 	private array function jarUrlCandidates( required string version, required boolean light ) {
 		var urls = [];
-		// Releases, RCs and alphas: GitHub Releases first. Snapshots are not published there.
-		if ( !isSnapshot( arguments.version ) ) {
+		if ( isSnapshot( arguments.version ) ) {
+			// Snapshots: Sonatype first. maven.lucee-services.com is only a fallback and will no longer host snapshots in the future.
+			var sonatypeUrl = sonatypeSnapshotJarUrl( arguments.version, arguments.light );
+			if ( len( sonatypeUrl ) ) {
+				arrayAppend( urls, sonatypeUrl );
+			}
+		} else {
+			// Releases, RCs and alphas: GitHub Releases first, then Maven Central (the main jar), then our Maven endpoint.
 			arrayAppend( urls, gitHubJarUrl( arguments.version, arguments.light ) );
+			arrayAppend( urls, mavenCentralJarUrl( arguments.version, arguments.light ) );
 		}
-		arrayAppend( urls, mavenJarUrl( arguments.version, arguments.light ) );
+		// Last fallback for every kind of version, including snapshots Sonatype has already dropped.
+		arrayAppend( urls, mavenServicesJarUrl( arguments.version, arguments.light ) );
 		return urls;
 	}
 
@@ -339,9 +350,66 @@ component {
 		return variables.gitHubReleaseUrl & '/' & tag & '/' & fileName;
 	}
 
-	private string function mavenJarUrl( required string version, required boolean light ) {
+	private string function mavenCentralJarUrl( required string version, required boolean light ) {
 		var fileName = arguments.light ? 'lucee-#arguments.version#-light.jar' : 'lucee-#arguments.version#.jar';
-		return variables.mavenRepoUrl & '/org/lucee/lucee/' & arguments.version & '/' & fileName;
+		return variables.mavenCentralUrl & '/org/lucee/lucee/' & arguments.version & '/' & fileName;
+	}
+
+	private string function mavenServicesJarUrl( required string version, required boolean light ) {
+		var fileName = arguments.light ? 'lucee-#arguments.version#-light.jar' : 'lucee-#arguments.version#.jar';
+		return variables.mavenServicesUrl & '/org/lucee/lucee/' & arguments.version & '/' & fileName;
+	}
+
+	/**
+	 * Resolve the timestamped snapshot jar on Sonatype from maven-metadata.xml.
+	 * Returns an empty string when that version is no longer there, so the caller can fall back.
+	 */
+	private string function sonatypeSnapshotJarUrl( required string version, required boolean light ) {
+		var metaUrl = variables.sonatypeSnapshotsUrl & '/org/lucee/lucee/' & arguments.version & '/maven-metadata.xml';
+		http url=metaUrl method="GET" result="local.res" timeout="30" throwOnError="false";
+		var status = val( local.res.status_code ?: 0 );
+		if ( status != 200 || !len( local.res.filecontent ?: '' ) ) {
+			print.line( 'Sonatype has no snapshot metadata for #arguments.version# (HTTP #status#).' ).toConsole();
+			return '';
+		}
+		var stamp = snapshotTimestampValue( toString( local.res.filecontent ), arguments.light );
+		if ( !len( stamp ) ) {
+			print.line( 'Sonatype metadata for #arguments.version# has no #( arguments.light ? 'light ' : '' )#jar.' ).toConsole();
+			return '';
+		}
+		var fileName = arguments.light ? 'lucee-#stamp#-light.jar' : 'lucee-#stamp#.jar';
+		return variables.sonatypeSnapshotsUrl & '/org/lucee/lucee/' & arguments.version & '/' & fileName;
+	}
+
+	private string function snapshotTimestampValue( required string metadata, required boolean light ) {
+		try {
+			var doc = xmlParse( arguments.metadata );
+			var xpath = arguments.light
+				? "/metadata/versioning/snapshotVersions/snapshotVersion[classifier='light' and extension='jar']/value"
+				: "/metadata/versioning/snapshotVersions/snapshotVersion[extension='jar' and not(classifier)]/value";
+			var nodes = xmlSearch( doc, xpath );
+			if ( arrayLen( nodes ) && len( trim( nodes[ 1 ].xmlText ?: '' ) ) ) {
+				return trim( nodes[ 1 ].xmlText );
+			}
+		} catch ( any e ) {
+			// Fall through to the regex parse below
+		}
+
+		var blocks = reMatchNoCase( '(?s)<snapshotVersion>.*?</snapshotVersion>', arguments.metadata );
+		for ( var block in blocks ) {
+			if ( !reFindNoCase( '<extension>\s*jar\s*</extension>', block ) ) {
+				continue;
+			}
+			var hasClassifier = reFindNoCase( '<classifier>', block );
+			var isLight = reFindNoCase( '<classifier>\s*light\s*</classifier>', block );
+			if ( arguments.light ? isLight : !hasClassifier ) {
+				var valueMatch = reFindNoCase( '<value>\s*([^<]+?)\s*</value>', block, 1, true );
+				if ( arrayLen( valueMatch.pos ) >= 2 && valueMatch.pos[ 2 ] > 0 ) {
+					return trim( mid( block, valueMatch.pos[ 2 ], valueMatch.len[ 2 ] ) );
+				}
+			}
+		}
+		return '';
 	}
 
 	private boolean function isSnapshot( required string version ) {
@@ -361,6 +429,12 @@ component {
 			return false;
 		}
 		if ( host == 'github.com' || host == 'maven.lucee-services.com' || host == 'mvn.lucee-services.com' ) {
+			return true;
+		}
+		if ( host == 'central.sonatype.com' || hostEndsWith( host, '.sonatype.com' ) ) {
+			return true;
+		}
+		if ( host == 'repo1.maven.org' || host == 'repo.maven.apache.org' ) {
 			return true;
 		}
 		// GitHub release assets are served from release-assets.githubusercontent.com and similar hosts

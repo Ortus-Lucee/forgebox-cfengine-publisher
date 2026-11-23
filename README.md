@@ -21,7 +21,12 @@ All new Lucee releases that are not published on ForgeBox will be
 * Uploaded to S3
 * Published to ForgeBox
 
-Jars are taken from [GitHub Releases](https://github.com/lucee/Lucee/releases) for releases, RCs and alphas, and from [maven.lucee-services.com](https://maven.lucee-services.com/org/lucee/lucee/) for snapshots and as a fallback. The version list still comes from `https://release.lucee.org/rest/update/provider/list?extended=true`. This is done for Lucee and Lucee Light editions.
+Jars are taken from:
+
+* Snapshots: [Sonatype's Central snapshot repository](https://central.sonatype.com/repository/maven-snapshots/org/lucee/lucee/) first (the timestamped artifact from `maven-metadata.xml`). [maven.lucee-services.com](https://maven.lucee-services.com/org/lucee/lucee/) is only a fallback, and will no longer host snapshots in the future.
+* Releases, RCs and alphas: [GitHub Releases](https://github.com/lucee/Lucee/releases) first, then [Maven Central](https://repo1.maven.org/maven2/org/lucee/lucee/) for the main jar, then maven.lucee-services.com as the last fallback.
+
+The version list still comes from `https://release.lucee.org/rest/update/provider/list?extended=true`. This is done for Lucee and Lucee Light editions.
 
 To build a package locally without publishing it:
 
