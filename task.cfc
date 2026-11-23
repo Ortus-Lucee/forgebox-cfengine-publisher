@@ -31,7 +31,7 @@ component {
 
 		print.text( 'Getting Lucee Versions: ' ).toConsole();
 		// This is every version of Lucee ever published since 5.0.0
-		http url="https://release.lucee.org/rest/update/provider/list?extended=true" result="local.luceeVersions";
+		http url="https://update.lucee.org/rest/update/provider/list?extended=true" result="local.luceeVersions";
 		if( isJSON( local.luceeVersions.fileContent ) ) {
 			local.luceeVersions = deserializeJSON( local.luceeVersions.fileContent ).map( (k,v)=>{
 				// Convert 1.2.3.4-foo to 1.2.3-foo+4 (semver)
